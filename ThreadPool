@@ -1,0 +1,61 @@
+import java.util.Vector;
+
+public class ThreadPool {
+    Vector jobs = new Vector();
+    private int workingThreads = 0;
+    private int maxThreads;
+    private int startedThreads = 0;
+
+    public ThreadPool(int m) {
+        maxThreads = m;
+    }
+
+    synchronized public void doJob(Runnable r) {
+        if (startedThreads < maxThreads) {
+            Worker t = new Worker();
+            t.setDaemon(true);
+            // Status nicht bei der Ermittlung des
+            // Beendigungszeitpunkts eines Java-Programms berücksichtigt wird
+            t.start();
+            startedThreads++;
+            jobs.add(r);
+            notifyAll();
+        }
+    }
+
+    synchronized public void waitUntilComplete() {
+        try {
+            while (jobs.size() > 0 || workingThreads > 0) {
+                wait();
+            }
+        } catch (InterruptedException ie) {
+            // plays no role
+        }
+    }
+
+    private class Worker extends Thread {
+        public void run() {
+            while (true) {
+                Runnable job;
+                synchronized (ThreadPool.this) {
+                    try {
+                        while (jobs.size() == 0) {
+                            ThreadPool.this.wait();
+                        }
+                    } catch (InterruptedException e) {
+                        // plays no role
+                    }
+                    job=(Runnable) jobs.firstElement();
+                    jobs.remove(job);
+                    workingThreads++;
+                }
+                    job.run();
+                    synchronized (ThreadPool.this) {
+                        workingThreads--;
+                        ThreadPool.this.notifyAll();
+                    }
+                }
+            }
+        }
+    }
+
